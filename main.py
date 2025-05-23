@@ -5,7 +5,7 @@ import os
 INPUT_DIR = "input"
 OUTPUT_DIR = "output"
 LOGO_DIR = "logos"
-LOGO_SIZE_RATIO = 0.2  # Размер логотипа относительно ширины изображения
+LOGO_SIZE_RATIO = 0.3  # Размер логотипа относительно ширины изображения
 
 # --- Доступные форматы ---
 SUPPORTED_FORMATS = (".jpg", ".jpeg", ".png", ".webp")
@@ -39,34 +39,51 @@ def resize_logo(base_img, logo_img):
     h = int(logo_img.height * ratio)
     return logo_img.resize((w, h), Image.LANCZOS)
 
+
 def apply_logo(image_path, logo_img):
     base_img = Image.open(image_path).convert("RGBA")
-    logo_resized = resize_logo(base_img, logo_img)
-
     W, H = base_img.size
+
+    # Пропорция логотипа относительно ширины изображения
+    LOGO_SIZE_RATIO = 0.25
+    logo_w_target = int(W * LOGO_SIZE_RATIO)
+    
+    # Масштабирование логотипа по ширине
+    ratio = logo_w_target / logo_img.width
+    logo_h_target = int(logo_img.height * ratio)
+    logo_resized = logo_img.resize((logo_w_target, logo_h_target), Image.LANCZOS)
+
+    lw, lh = logo_resized.size
     center_x = W // 2
     center_y = H // 2
 
-    # Смещения в процентах от ширины/высоты
-    relative_offsets = [
-        (0.0, 0.0),      # Центр
-        (0.1, -0.1),     # Вверх-вправо
-        (0.2, -0.2),     # Еще выше вправо
-        (-0.1, 0.1),     # Вниз-влево
-        (-0.2, 0.2)      # Еще ниже влево
+    # Смещение от центра (35% ширины и высоты)
+    offset_x = int(W * 0.35)
+    offset_y = int(H * 0.35)
+
+    # 5 позиций: центр + диагонали
+    positions = [
+        (center_x - lw // 2, center_y - lh // 2),                            # Центр
+        (center_x - offset_x - lw // 2, center_y - offset_y - lh // 2),     # Левый верх
+        (center_x + offset_x - lw // 2, center_y - offset_y - lh // 2),     # Правый верх
+        (center_x - offset_x - lw // 2, center_y + offset_y - lh // 2),     # Левый низ
+        (center_x + offset_x - lw // 2, center_y + offset_y - lh // 2),     # Правый низ
     ]
 
-    for dx_perc, dy_perc in relative_offsets:
-        dx = int(W * dx_perc)
-        dy = int(H * dy_perc)
-        x = center_x + dx - logo_resized.width // 2
-        y = center_y + dy - logo_resized.height // 2
-        base_img.paste(logo_resized, (x, y), logo_resized)
+    overlay = Image.new("RGBA", base_img.size, (255, 255, 255, 0))
 
-    # Сохраняем
+    for x, y in positions:
+        overlay.paste(logo_resized, (x, y), logo_resized)
+
+    result = Image.alpha_composite(base_img, overlay)
+
     output_filename = os.path.splitext(os.path.basename(image_path))[0] + "." + output_format.lower()
-    base_img.convert("RGB").save(os.path.join(OUTPUT_DIR, output_filename), output_format)
+    result.convert("RGB").save(os.path.join(OUTPUT_DIR, output_filename), output_format)
     print(f"✅ {output_filename} создан")
+
+
+
+
 
 
 
